@@ -1,1 +1,2 @@
 - [Streamlit workflow startup](streamlit-startup.md) — use headless mode and disable usage stats to avoid the first-run email prompt blocking startup.
+- [Streamlit artifact production paths](streamlit-artifact-production-path.md) — production artifact commands may run from the workspace root, unlike development workflow commands.

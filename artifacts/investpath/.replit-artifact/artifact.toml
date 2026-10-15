@@ -18,7 +18,7 @@ run = "uv run streamlit run ../../main.py --server.address 0.0.0.0 --server.port
 build = ["uv", "sync", "--frozen"]
 
 [services.production.run]
-args = ["uv", "run", "--frozen", "streamlit", "run", "../../main.py", "--server.address", "0.0.0.0", "--server.port", "18942", "--server.headless", "true", "--browser.gatherUsageStats", "false"]
+args = ["uv", "run", "--frozen", "streamlit", "run", "main.py", "--server.address", "0.0.0.0", "--server.port", "18942", "--server.headless", "true", "--browser.gatherUsageStats", "false"]
 
 [services.production.run.env]
 PORT = "18942"
