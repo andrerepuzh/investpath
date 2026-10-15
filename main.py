@@ -3,6 +3,7 @@
 import streamlit as st
 
 from calculator import Projection, calculate_projection
+from styles import apply_styles
 
 
 SCENARIOS = (
@@ -19,21 +20,41 @@ def format_euros(amount: float) -> str:
 
 def render_scenario(name: str, annual_return: float, description: str, projection: Projection) -> None:
     with st.container(border=True):
+        st.markdown(
+            f'<span class="ip-scenario-tag">{name} scenario</span>',
+            unsafe_allow_html=True,
+        )
         st.subheader(name)
         st.caption(f"{annual_return:.0%} assumed annual return · illustrative")
         st.metric("Projected value", format_euros(projection.portfolio_value))
-        st.write(description)
+        st.caption(description)
 
 
 def main() -> None:
     st.set_page_config(
         page_title="InvestPath — Investment Calculator",
-        page_icon="📈",
         layout="wide",
     )
+    apply_styles()
 
-    st.title("InvestPath")
-    st.write("A clearer first step into long-term investing.")
+    st.markdown(
+        """
+        <section class="ip-hero" aria-label="InvestPath introduction">
+            <div class="ip-hero__content">
+                <p class="ip-hero__eyebrow">InvestPath · learn by exploring</p>
+                <h1>Make your future<br><span>feel clearer.</span></h1>
+                <p class="ip-hero__description">
+                    Explore how time, regular contributions, and changing assumptions
+                    could shape a portfolio. Adjust the numbers and see the illustration update.
+                </p>
+            </div>
+            <svg class="ip-hero__wave" viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0,37 C170,82 340,76 510,42 C690,5 850,7 1030,45 C1190,79 1320,77 1440,35 L1440,90 L0,90 Z"></path>
+            </svg>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
     st.warning(
         "All results are hypothetical, not guaranteed, and are not personalized "
         "investment advice. Real investments can lose value."
@@ -41,6 +62,7 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Your assumptions")
+        st.caption("Change any value to update your illustration.")
         initial_investment = st.number_input(
             "Initial investment (€)",
             min_value=0.0,
@@ -104,7 +126,8 @@ def main() -> None:
         annual_return=annual_return_percent / 100,
     )
 
-    st.subheader(f"Your {years}-year illustration")
+    st.markdown('<p class="ip-section-label">Your projection</p>', unsafe_allow_html=True)
+    st.subheader(f"A {years}-year illustration")
     st.caption(
         f"Using a {annual_return_percent:.2f}% gross annual return, "
         f"{annual_fee_percent:.2f}% annual fee, and "
@@ -129,14 +152,22 @@ def main() -> None:
         }
         for point in projection.timeline
     ]
-    st.subheader("How your portfolio could grow")
-    st.line_chart(
-        chart_data,
-        x="Year",
-        y=["Total contributions", "Projected portfolio"],
-        x_label="Years",
-        y_label="Value (€)",
-    )
+    with st.container(border=True):
+        st.markdown(
+            '<p class="ip-section-label">Growth over time</p>',
+            unsafe_allow_html=True,
+        )
+        st.subheader("How your portfolio could grow")
+        st.line_chart(
+            chart_data,
+            x="Year",
+            y=["Total contributions", "Projected portfolio"],
+            x_label="Years",
+            y_label="Value (€)",
+            color=["#b2c8b7", "#28634f"],
+            height=360,
+            alt="Interactive line chart comparing total contributions with the projected portfolio value over time.",
+        )
     st.caption(
         "The contribution line includes your initial investment and monthly deposits. "
         "The portfolio line includes the assumed net growth."
