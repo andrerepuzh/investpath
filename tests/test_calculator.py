@@ -1,7 +1,12 @@
 import math
 import unittest
 
-from calculator import calculate_projection
+from calculator import (
+    calculate_projection,
+    calculate_required_monthly_contribution,
+    export_projection_csv,
+    find_milestones,
+)
 
 
 class CalculateProjectionTests(unittest.TestCase):
@@ -106,6 +111,82 @@ class CalculateProjectionTests(unittest.TestCase):
     def test_rejects_non_finite_assumptions(self):
         with self.assertRaisesRegex(ValueError, "finite"):
             calculate_projection(100, 10, 1, math.inf)
+
+    def test_goal_planner_normal(self):
+        req = calculate_required_monthly_contribution(
+            target_value=50_000,
+            initial_investment=5_000,
+            years=5,
+            annual_return=0.06,
+        )
+        self.assertGreater(req, 0)
+        # Verify it achieves target
+        res = calculate_projection(
+            initial_investment=5_000,
+            monthly_contribution=req,
+            years=5,
+            annual_return=0.06,
+        )
+        self.assertGreaterEqual(res.portfolio_value, 50_000)
+
+    def test_goal_planner_zero_return(self):
+        req = calculate_required_monthly_contribution(
+            target_value=12_000,
+            initial_investment=0,
+            years=1,
+            annual_return=0.0,
+        )
+        self.assertAlmostEqual(req, 1_000)
+
+    def test_goal_planner_already_achieved(self):
+        req = calculate_required_monthly_contribution(
+            target_value=5_000,
+            initial_investment=10_000,
+            years=1,
+            annual_return=0.05,
+        )
+        self.assertEqual(req, 0.0)
+
+    def test_goal_planner_unreachable(self):
+        with self.assertRaisesRegex(ValueError, "unreachable"):
+            calculate_required_monthly_contribution(
+                target_value=100_000_000,
+                initial_investment=0,
+                years=1,
+                annual_return=0.01,
+            )
+
+    def test_milestones_reached(self):
+        proj = calculate_projection(
+            initial_investment=5_000,
+            monthly_contribution=500,
+            years=3,
+            annual_return=0.08,
+        )
+        milestones = find_milestones(proj.timeline, [10_000, 25_000])
+        self.assertIsNotNone(milestones[10_000])
+        self.assertIsNotNone(milestones[25_000])
+
+    def test_milestones_not_reached(self):
+        proj = calculate_projection(
+            initial_investment=100,
+            monthly_contribution=10,
+            years=1,
+            annual_return=0.01,
+        )
+        milestones = find_milestones(proj.timeline, [100_000])
+        self.assertIsNone(milestones[100_000])
+
+    def test_export_projection_csv(self):
+        proj = calculate_projection(
+            initial_investment=1_000,
+            monthly_contribution=100,
+            years=1,
+            annual_return=0.05,
+        )
+        csv_str = export_projection_csv(proj, annual_inflation=0.02)
+        self.assertIn("Month,Year,Total Contributions (€),Projected Portfolio (€),Estimated Growth (€),Inflation-Adjusted Value (€)", csv_str)
+        self.assertIn("12,", csv_str)
 
 
 if __name__ == "__main__":

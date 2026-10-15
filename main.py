@@ -2,7 +2,13 @@
 
 import streamlit as st
 
-from calculator import Projection, calculate_projection
+from calculator import (
+    Projection,
+    calculate_projection,
+    calculate_required_monthly_contribution,
+    export_projection_csv,
+    find_milestones,
+)
 from styles import apply_styles
 
 
@@ -41,16 +47,13 @@ def main() -> None:
         """
         <section class="ip-hero" aria-label="InvestPath introduction">
             <div class="ip-hero__content">
-                <p class="ip-hero__eyebrow">InvestPath · learn by exploring</p>
-                <h1>Make your future<br><span>feel clearer.</span></h1>
+                <p class="ip-hero__eyebrow">InvestPath · intelligent wealth modeling</p>
+                <h1>Your future,<br><span>in focus.</span></h1>
                 <p class="ip-hero__description">
-                    Explore how time, regular contributions, and changing assumptions
-                    could shape a portfolio. Adjust the numbers and see the illustration update.
+                    Explore how time, regular contributions, and disciplined compounding
+                    shape your financial horizon. Adjust your assumptions below and watch your projection update instantly.
                 </p>
             </div>
-            <svg class="ip-hero__wave" viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden="true">
-                <path d="M0,37 C170,82 340,76 510,42 C690,5 850,7 1030,45 C1190,79 1320,77 1440,35 L1440,90 L0,90 Z"></path>
-            </svg>
         </section>
         """,
         unsafe_allow_html=True,
@@ -62,7 +65,7 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Your assumptions")
-        st.caption("Change any value to update your illustration.")
+        st.caption("Fine-tune your parameters to simulate your financial trajectory.")
         initial_investment = st.number_input(
             "Initial investment (€)",
             min_value=0.0,
@@ -151,7 +154,7 @@ def main() -> None:
     )
 
     st.markdown('<p class="ip-section-label">Your projection</p>', unsafe_allow_html=True)
-    st.subheader(f"A {years}-year illustration")
+    st.subheader(f"A {years}-year financial horizon")
     timing_display = (
         "beginning" if contribution_timing == "beginning" else "end"
     )
@@ -187,10 +190,10 @@ def main() -> None:
 
     gain_description = (
         f"Of the projected {format_euros(projection.portfolio_value)}, "
-        f"{format_euros(projection.total_contributions)} comes from the initial "
-        f"investment and monthly deposits. The remaining "
-        f"{format_euros(abs(projection.estimated_gain))} is the modeled "
-        f"{'growth' if projection.estimated_gain >= 0 else 'decline'} under these assumptions."
+        f"{format_euros(projection.total_contributions)} comes from your initial "
+        f"investment and regular monthly deposits. The remaining "
+        f"{format_euros(abs(projection.estimated_gain))} represents modeled "
+        f"{'growth' if projection.estimated_gain >= 0 else 'decline'} under your chosen assumptions."
     )
     st.markdown(f"**Breakdown:** {gain_description}")
 
@@ -207,21 +210,111 @@ def main() -> None:
             '<p class="ip-section-label">Growth over time</p>',
             unsafe_allow_html=True,
         )
-        st.subheader("How your portfolio could grow")
+        st.subheader("How your wealth could compound")
         st.line_chart(
             chart_data,
             x="Year",
             y=["Total contributions", "Projected portfolio"],
-            x_label="Years",
-            y_label="Value (€)",
-            color=["#b2c8b7", "#28634f"],
-            height=360,
-            alt="Interactive line chart comparing total contributions with the projected portfolio value over time.",
+            color=["#64748b", "#059669"],
+            height=380,
         )
-    st.caption(
-        "The contribution line includes your initial investment and monthly deposits. "
-        "The gap between the lines represents modeled growth or decline."
+
+    # Feature 3: Downloadable Projection CSV
+    csv_data = export_projection_csv(projection, annual_inflation=effective_annual_inflation)
+    st.download_button(
+        label="📥 Export monthly projection table (CSV)",
+        data=csv_data,
+        file_name="investpath_projection.csv",
+        mime="text/csv",
+        help="Download month-by-month financial projection table compatible with Excel and Google Sheets.",
     )
+
+    st.caption(
+        "The slate line tracks your total cash contributions (principal), while "
+        "the emerald line shows your total portfolio value over time. The expanding "
+        "gap between them highlights cumulative compounding growth."
+    )
+
+    # Feature 1: Financial Goal Planner Section
+    with st.container(border=True):
+        st.markdown('<p class="ip-section-label">Goal planner</p>', unsafe_allow_html=True)
+        st.subheader("🎯 Calculate required monthly contribution")
+        st.caption("Specify your target future wealth goal and see what monthly savings rate is required under your current return and fee assumptions.")
+        
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            goal_target_value = st.number_input(
+                "Target future portfolio value (€)",
+                min_value=1_000.0,
+                max_value=50_000_000.0,
+                value=max(100_000.0, round(projection.portfolio_value * 1.5, -3)),
+                step=5_000.0,
+                help="The desired future value you want to achieve.",
+            )
+        with col_g2:
+            goal_years = st.number_input(
+                "Years to reach target",
+                min_value=1,
+                max_value=60,
+                value=int(years),
+                step=1,
+                help="Time horizon for achieving your financial goal.",
+            )
+
+        try:
+            required_monthly = calculate_required_monthly_contribution(
+                target_value=goal_target_value,
+                initial_investment=initial_investment,
+                years=int(goal_years),
+                annual_return=annual_return_percent / 100,
+                annual_fee=annual_fee_percent / 100,
+                annual_inflation=effective_annual_inflation,
+                contribution_timing=contribution_timing,
+            )
+            if required_monthly == 0.0:
+                st.success("🎉 Your initial investment alone already achieves or exceeds this target within your timeframe!")
+            else:
+                diff = monthly_contribution - required_monthly
+                if diff >= 0:
+                    st.success(
+                        f"✅ **You are on track!** Your current monthly contribution ({format_euros(monthly_contribution)}/mo) "
+                        f"exceeds the required **{format_euros(required_monthly)}/mo** to reach {format_euros(goal_target_value)} in {int(goal_years)} years."
+                    )
+                else:
+                    st.info(
+                        f"💡 To reach **{format_euros(goal_target_value)}** in {int(goal_years)} years, you need to save "
+                        f"**{format_euros(required_monthly)} per month** (an increase of +{format_euros(abs(diff))}/mo over your current €{monthly_contribution:,.0f}/mo contribution)."
+                    )
+        except ValueError as e:
+            st.warning(str(e))
+
+    # Feature 2: Investment Milestones Section
+    with st.container(border=True):
+        st.markdown('<p class="ip-section-label">Milestones</p>', unsafe_allow_html=True)
+        st.subheader("🏆 Wealth Milestones")
+        st.caption("Estimated timeline when your portfolio crosses major wealth thresholds under your current assumptions.")
+
+        milestones_dict = find_milestones(projection.timeline, [10_000.0, 25_000.0, 50_000.0, 100_000.0])
+        m_cols = st.columns(4)
+        milestone_thresholds = [10_000.0, 25_000.0, 50_000.0, 100_000.0]
+        
+        for idx, threshold in enumerate(milestone_thresholds):
+            month_reached = milestones_dict[threshold]
+            col = m_cols[idx]
+            with col:
+                if month_reached is not None:
+                    yrs_val = month_reached / 12
+                    st.metric(
+                        f"Target: {format_euros(threshold)}",
+                        f"Month {month_reached}",
+                        f"~{yrs_val:.1f} years"
+                    )
+                else:
+                    st.metric(
+                        f"Target: {format_euros(threshold)}",
+                        "Not reached",
+                        f"Within {years} yrs"
+                    )
 
     st.subheader("Three illustrative return scenarios")
     scenario_columns = st.columns(3)
