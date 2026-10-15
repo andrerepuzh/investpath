@@ -6,6 +6,7 @@ from calculator import (
     calculate_required_monthly_contribution,
     export_projection_csv,
     find_milestones,
+    run_monte_carlo_simulation,
 )
 
 
@@ -187,6 +188,80 @@ class CalculateProjectionTests(unittest.TestCase):
         csv_str = export_projection_csv(proj, annual_inflation=0.02)
         self.assertIn("Month,Year,Total Contributions (€),Projected Portfolio (€),Estimated Growth (€),Inflation-Adjusted Value (€)", csv_str)
         self.assertIn("12,", csv_str)
+
+    def test_monte_carlo_reproducibility(self):
+        res1 = run_monte_carlo_simulation(
+            initial_investment=5_000,
+            monthly_contribution=200,
+            years=3,
+            annual_return=0.07,
+            annual_volatility=0.15,
+            num_simulations=100,
+            seed=42,
+        )
+        res2 = run_monte_carlo_simulation(
+            initial_investment=5_000,
+            monthly_contribution=200,
+            years=3,
+            annual_return=0.07,
+            annual_volatility=0.15,
+            num_simulations=100,
+            seed=42,
+        )
+        self.assertEqual(res1.median_final_value, res2.median_final_value)
+        self.assertEqual(res1.p10_final_value, res2.p10_final_value)
+
+    def test_monte_carlo_zero_volatility(self):
+        det = calculate_projection(
+            initial_investment=5_000,
+            monthly_contribution=200,
+            years=3,
+            annual_return=0.07,
+        )
+        mc = run_monte_carlo_simulation(
+            initial_investment=5_000,
+            monthly_contribution=200,
+            years=3,
+            annual_return=0.07,
+            annual_volatility=0.0,
+            num_simulations=10,
+            seed=42,
+        )
+        self.assertAlmostEqual(det.portfolio_value, mc.median_final_value, places=2)
+
+    def test_monte_carlo_dimensions(self):
+        mc = run_monte_carlo_simulation(
+            initial_investment=1_000,
+            monthly_contribution=100,
+            years=2,
+            annual_return=0.06,
+            num_simulations=50,
+            seed=123,
+        )
+        self.assertEqual(len(mc.percentile_timeline), 25)
+        self.assertGreaterEqual(mc.p90_final_value, mc.median_final_value)
+        self.assertGreaterEqual(mc.median_final_value, mc.p10_final_value)
+
+    def test_monte_carlo_invalid_inputs(self):
+        with self.assertRaises(ValueError):
+            run_monte_carlo_simulation(100, 10, 1, 0.05, annual_volatility=-0.1)
+        with self.assertRaises(ValueError):
+            run_monte_carlo_simulation(100, 10, 1, 0.05, num_simulations=0)
+
+    def test_monte_carlo_goal_probability(self):
+        mc = run_monte_carlo_simulation(
+            initial_investment=10_000,
+            monthly_contribution=500,
+            years=5,
+            annual_return=0.08,
+            annual_volatility=0.15,
+            num_simulations=200,
+            target_goal=30_000,
+            seed=99,
+        )
+        self.assertIsNotNone(mc.goal_attainment_probability)
+        self.assertGreaterEqual(mc.goal_attainment_probability, 0.0)
+        self.assertLessEqual(mc.goal_attainment_probability, 100.0)
 
 
 if __name__ == "__main__":
