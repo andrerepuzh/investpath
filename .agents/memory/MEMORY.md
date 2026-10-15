@@ -1,0 +1,1 @@
+- [Streamlit workflow startup](streamlit-startup.md) — use headless mode and disable usage stats to avoid the first-run email prompt blocking startup.

@@ -1,0 +1,192 @@
+"""InvestPath: an educational, hypothetical investment calculator."""
+
+import streamlit as st
+
+from calculator import Projection, calculate_projection
+
+
+SCENARIOS = (
+    ("Low", 0.03, "A cautious illustrative return assumption."),
+    ("Base", 0.06, "A middle illustrative return assumption."),
+    ("High", 0.09, "A more optimistic illustrative return assumption."),
+)
+
+
+def format_euros(amount: float) -> str:
+    """Format euros consistently, using a period for decimals."""
+    return f"€{amount:,.0f}"
+
+
+def render_scenario(name: str, annual_return: float, description: str, projection: Projection) -> None:
+    with st.container(border=True):
+        st.subheader(name)
+        st.caption(f"{annual_return:.0%} assumed annual return · illustrative")
+        st.metric("Projected value", format_euros(projection.portfolio_value))
+        st.write(description)
+
+
+def main() -> None:
+    st.set_page_config(
+        page_title="InvestPath — Investment Calculator",
+        page_icon="📈",
+        layout="wide",
+    )
+
+    st.title("InvestPath")
+    st.write("A clearer first step into long-term investing.")
+    st.warning(
+        "All results are hypothetical, not guaranteed, and are not personalized "
+        "investment advice. Real investments can lose value."
+    )
+
+    with st.sidebar:
+        st.header("Your assumptions")
+        initial_investment = st.number_input(
+            "Initial investment (€)",
+            min_value=0.0,
+            max_value=10_000_000.0,
+            value=5_000.0,
+            step=500.0,
+            help="The amount invested at the beginning of the first month.",
+        )
+        monthly_contribution = st.number_input(
+            "Monthly contribution (€)",
+            min_value=0.0,
+            max_value=1_000_000.0,
+            value=200.0,
+            step=50.0,
+            help="Added at the end of each month.",
+        )
+        years = st.number_input(
+            "Investment duration (years)",
+            min_value=1,
+            max_value=60,
+            value=20,
+            step=1,
+        )
+        annual_return_percent = st.number_input(
+            "Assumed annual return (%)",
+            min_value=-50.0,
+            max_value=30.0,
+            value=6.0,
+            step=0.25,
+            format="%.2f",
+            help="An illustrative effective annual return before the fee.",
+        )
+        annual_fee_percent = st.number_input(
+            "Annual fee (%)",
+            min_value=0.0,
+            max_value=10.0,
+            value=0.25,
+            step=0.05,
+            format="%.2f",
+            help="A simplified annual fee deducted from the assumed return.",
+        )
+        annual_inflation_percent = st.number_input(
+            "Assumed annual inflation (%)",
+            min_value=0.0,
+            max_value=20.0,
+            value=2.0,
+            step=0.25,
+            format="%.2f",
+            help="Used only to estimate what the future amount may buy in today's euros.",
+        )
+
+    assumptions = {
+        "initial_investment": initial_investment,
+        "monthly_contribution": monthly_contribution,
+        "years": int(years),
+        "annual_fee": annual_fee_percent / 100,
+        "annual_inflation": annual_inflation_percent / 100,
+    }
+    projection = calculate_projection(
+        **assumptions,
+        annual_return=annual_return_percent / 100,
+    )
+
+    st.subheader(f"Your {years}-year illustration")
+    st.caption(
+        f"Using a {annual_return_percent:.2f}% gross annual return, "
+        f"{annual_fee_percent:.2f}% annual fee, and "
+        f"{annual_inflation_percent:.2f}% annual inflation."
+    )
+
+    metric_columns = st.columns(4)
+    metric_columns[0].metric("Projected portfolio", format_euros(projection.portfolio_value))
+    metric_columns[1].metric("Total contributions", format_euros(projection.total_contributions))
+    metric_columns[2].metric("Estimated gain", format_euros(projection.estimated_gain))
+    metric_columns[3].metric(
+        "Value in today's euros",
+        format_euros(projection.inflation_adjusted_value),
+        help="The projected portfolio value adjusted for the assumed inflation over the full period.",
+    )
+
+    chart_data = [
+        {
+            "Year": point.month / 12,
+            "Total contributions": point.total_contributions,
+            "Projected portfolio": point.portfolio_value,
+        }
+        for point in projection.timeline
+    ]
+    st.subheader("How your portfolio could grow")
+    st.line_chart(
+        chart_data,
+        x="Year",
+        y=["Total contributions", "Projected portfolio"],
+        x_label="Years",
+        y_label="Value (€)",
+    )
+    st.caption(
+        "The contribution line includes your initial investment and monthly deposits. "
+        "The portfolio line includes the assumed net growth."
+    )
+
+    st.subheader("Three illustrative return scenarios")
+    scenario_columns = st.columns(3)
+    for column, (name, annual_return, description) in zip(scenario_columns, SCENARIOS):
+        scenario_projection = calculate_projection(
+            **assumptions,
+            annual_return=annual_return,
+        )
+        with column:
+            render_scenario(name, annual_return, description, scenario_projection)
+
+    with st.expander("How the calculations work"):
+        st.markdown(
+            """
+            - **Total contributions** = initial investment + monthly contribution ×
+              number of months.
+            - **Net annual return** = assumed annual return − annual fee. This is a
+              simplified way to represent the fee.
+            - **Monthly return** = `(1 + net annual return)^(1/12) − 1`. This converts
+              the effective annual assumption to a monthly rate, so 12 months of
+              compounding equal one year at the net annual rate.
+            - **Projected portfolio** grows the existing balance each month, then
+              adds that month's contribution. Contributions are made at the **end
+              of each month**, so a deposit starts growing the following month.
+            - **Estimated gain** = projected portfolio − total contributions. It
+              can be negative if the assumptions produce a loss.
+            - **Value in today's euros** = projected portfolio ÷
+              `(1 + annual inflation)^years`. This adjusts the nominal value for
+              assumed loss of purchasing power; it is not an amount of money you
+              receive today.
+
+            The model assumes the same return, fee, and inflation every year. It
+            does not model market ups and downs, taxes, or changes in costs.
+            """
+        )
+
+    st.info(
+        "Investing involves risk, including the possible loss of your initial "
+        "investment. These examples are for education only; they are hypothetical, "
+        "not guaranteed, and not personalized investment advice."
+    )
+    st.caption(
+        "Your assumptions are used only to calculate this page. InvestPath does not "
+        "create an account or save your financial inputs."
+    )
+
+
+if __name__ == "__main__":
+    main()
