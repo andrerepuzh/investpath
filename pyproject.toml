@@ -7,9 +7,5 @@ dependencies = [
     "streamlit>=1.30.0",
 ]
 
-[tool.setuptools]
-py-modules = ["main", "calculator", "styles"]
-
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+[tool.uv]
+package = false
