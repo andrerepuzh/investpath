@@ -77,7 +77,21 @@ def main() -> None:
             max_value=1_000_000.0,
             value=200.0,
             step=50.0,
-            help="Added at the end of each month.",
+            help="Added at the selected time each month.",
+        )
+        contribution_timing_label = st.selectbox(
+            "When is each monthly contribution added?",
+            options=("End of each month", "Beginning of each month"),
+            index=0,
+            help=(
+                "At month-end, a deposit starts growing next month. At month-start, "
+                "it grows during the month it is added."
+            ),
+        )
+        contribution_timing = (
+            "beginning"
+            if contribution_timing_label == "Beginning of each month"
+            else "end"
         )
         years = st.number_input(
             "Investment duration (years)",
@@ -104,6 +118,11 @@ def main() -> None:
             format="%.2f",
             help="A simplified annual fee deducted from the assumed return.",
         )
+        apply_inflation = st.checkbox(
+            "Adjust the future value for inflation",
+            value=True,
+            help="Turn this off to hide the purchasing-power estimate.",
+        )
         annual_inflation_percent = st.number_input(
             "Assumed annual inflation (%)",
             min_value=0.0,
@@ -112,14 +131,19 @@ def main() -> None:
             step=0.25,
             format="%.2f",
             help="Used only to estimate what the future amount may buy in today's euros.",
+            disabled=not apply_inflation,
         )
 
+    effective_annual_inflation = (
+        annual_inflation_percent / 100 if apply_inflation else 0.0
+    )
     assumptions = {
         "initial_investment": initial_investment,
         "monthly_contribution": monthly_contribution,
         "years": int(years),
         "annual_fee": annual_fee_percent / 100,
-        "annual_inflation": annual_inflation_percent / 100,
+        "annual_inflation": effective_annual_inflation,
+        "contribution_timing": contribution_timing,
     }
     projection = calculate_projection(
         **assumptions,
@@ -128,10 +152,20 @@ def main() -> None:
 
     st.markdown('<p class="ip-section-label">Your projection</p>', unsafe_allow_html=True)
     st.subheader(f"A {years}-year illustration")
+    timing_display = (
+        "beginning" if contribution_timing == "beginning" else "end"
+    )
+    inflation_summary = (
+        f"{annual_inflation_percent:.2f}% per year"
+        if apply_inflation
+        else "off"
+    )
     st.caption(
-        f"Using a {annual_return_percent:.2f}% gross annual return, "
-        f"{annual_fee_percent:.2f}% annual fee, and "
-        f"{annual_inflation_percent:.2f}% annual inflation."
+        f"Starting with {format_euros(initial_investment)}, adding "
+        f"{format_euros(monthly_contribution)} at the {timing_display} of each "
+        f"month for {int(years)} years. Gross return: {annual_return_percent:.2f}% "
+        f"per year; annual fee: {annual_fee_percent:.2f}%; "
+        f"inflation adjustment: {inflation_summary}."
     )
 
     metric_columns = st.columns(4)
@@ -140,9 +174,25 @@ def main() -> None:
     metric_columns[2].metric("Estimated gain", format_euros(projection.estimated_gain))
     metric_columns[3].metric(
         "Value in today's euros",
-        format_euros(projection.inflation_adjusted_value),
-        help="The projected portfolio value adjusted for the assumed inflation over the full period.",
+        (
+            format_euros(projection.inflation_adjusted_value)
+            if apply_inflation
+            else "Not applied"
+        ),
+        help=(
+            "Projected value adjusted for the assumed inflation over the full period. "
+            "Enable the inflation adjustment to show it."
+        ),
     )
+
+    gain_description = (
+        f"Of the projected {format_euros(projection.portfolio_value)}, "
+        f"{format_euros(projection.total_contributions)} comes from the initial "
+        f"investment and monthly deposits. The remaining "
+        f"{format_euros(abs(projection.estimated_gain))} is the modeled "
+        f"{'growth' if projection.estimated_gain >= 0 else 'decline'} under these assumptions."
+    )
+    st.markdown(f"**Breakdown:** {gain_description}")
 
     chart_data = [
         {
@@ -170,7 +220,7 @@ def main() -> None:
         )
     st.caption(
         "The contribution line includes your initial investment and monthly deposits. "
-        "The portfolio line includes the assumed net growth."
+        "The gap between the lines represents modeled growth or decline."
     )
 
     st.subheader("Three illustrative return scenarios")
@@ -189,22 +239,44 @@ def main() -> None:
             - **Total contributions** = initial investment + monthly contribution ×
               number of months.
             - **Net annual return** = assumed annual return − annual fee. This is a
-              simplified way to represent the fee.
+              simplified fee model, not a quote of how a particular provider charges.
             - **Monthly return** = `(1 + net annual return)^(1/12) − 1`. This converts
               the effective annual assumption to a monthly rate, so 12 months of
               compounding equal one year at the net annual rate.
-            - **Projected portfolio** grows the existing balance each month, then
-              adds that month's contribution. Contributions are made at the **end
-              of each month**, so a deposit starts growing the following month.
+            - **Projected portfolio** is calculated one month at a time. With an
+              end-of-month deposit: `new balance = old balance × (1 + monthly return)
+              + deposit`. With a beginning-of-month deposit: `new balance =
+              (old balance + deposit) × (1 + monthly return)`.
             - **Estimated gain** = projected portfolio − total contributions. It
               can be negative if the assumptions produce a loss.
             - **Value in today's euros** = projected portfolio ÷
               `(1 + annual inflation)^years`. This adjusts the nominal value for
-              assumed loss of purchasing power; it is not an amount of money you
-              receive today.
+              assumed loss of purchasing power; it is not money you receive today.
 
             The model assumes the same return, fee, and inflation every year. It
             does not model market ups and downs, taxes, or changes in costs.
+            """
+        )
+
+    with st.expander("Investing ideas in plain English"):
+        st.markdown(
+            """
+            - **Compound growth:** When returns stay invested, later returns can
+              apply to both your original money and earlier growth. The calculator
+              illustrates this with a steady monthly rate; real returns vary.
+            - **Regular contributions:** Depositing regularly adds money to the
+              plan over time. Earlier deposits have more time to grow, but neither
+              regular deposits nor this illustration remove investment risk.
+            - **Return and uncertainty:** A higher assumed return creates a larger
+              projection, but higher potential returns usually come with greater
+              uncertainty and the possibility of larger losses. The high scenario
+              is not a recommended target.
+            - **Inflation and buying power:** If prices rise, a future euro may buy
+              less than a euro today. The inflation-adjusted figure expresses the
+              projection in today's purchasing power.
+            - **Scenarios are not predictions:** Low, base, and high values simply
+              show how different return assumptions change the illustration.
+              They are not forecasts, probabilities, or guarantees.
             """
         )
 

@@ -32,6 +32,21 @@ they are not already installed.
 uv run python -m unittest discover -s tests -v
 ```
 
+## Deploy for free on Streamlit Community Cloud
+
+1. Connect this Replit project to a GitHub repository using **Tools → + → Git**,
+   then commit and push the project files.
+2. At [share.streamlit.io](https://share.streamlit.io/), choose **Create app**,
+   select the repository and branch, and set the app file path to `main.py`.
+3. In **Advanced settings**, select Python **3.13** or newer. This project
+   declares `requires-python = ">=3.13"` in `pyproject.toml`.
+4. Deploy. Community Cloud uses the root `uv.lock` file to install the Python
+   dependencies.
+
+The Streamlit Community Cloud app is the Python app in the repository root.
+The Replit `artifacts/investpath/` folder contains preview scaffolding and is
+not the Community Cloud entry point.
+
 ## Edit the app
 
 - `main.py` contains the Streamlit page, inputs, chart, scenario examples, and

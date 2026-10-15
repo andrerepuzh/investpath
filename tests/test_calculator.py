@@ -45,6 +45,26 @@ class CalculateProjectionTests(unittest.TestCase):
         self.assertEqual(result.timeline[0].portfolio_value, 1_000)
         self.assertEqual(result.timeline[1].total_contributions, 1_100)
 
+    def test_month_start_contributions_grow_from_the_month_they_are_added(self):
+        result = calculate_projection(
+            initial_investment=0,
+            monthly_contribution=100,
+            years=1,
+            annual_return=0.12,
+            contribution_timing="beginning",
+        )
+        expected = 100 * sum(
+            (1 + result.monthly_rate) ** month for month in range(1, 13)
+        )
+
+        self.assertAlmostEqual(result.total_contributions, 1_200)
+        self.assertAlmostEqual(result.portfolio_value, expected)
+        self.assertGreater(result.portfolio_value, 1_200)
+
+    def test_rejects_unknown_contribution_timing(self):
+        with self.assertRaisesRegex(ValueError, "Contribution timing"):
+            calculate_projection(100, 10, 1, 0.05, contribution_timing="mid-month")
+
     def test_fee_is_subtracted_from_annual_return_before_monthly_conversion(self):
         result = calculate_projection(
             initial_investment=1_000,

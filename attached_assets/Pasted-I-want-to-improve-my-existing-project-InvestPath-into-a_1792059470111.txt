@@ -1,0 +1,95 @@
+I want to improve my existing project, InvestPath, into a polished and useful investment planning web application for beginner investors.
+
+IMPORTANT RULES:
+- Inspect the existing project before making changes.
+- The application currently uses Python and Streamlit. The main entry point is `main.py`.
+- Preserve the existing architecture and working functionality.
+- Do not rebuild the project from scratch.
+- Do not remove existing features unless they are broken or redundant.
+- Do not introduce paid APIs, subscriptions, databases, or hosting services.
+- Do not add authentication or user accounts at this stage.
+- Keep the application deployable on Streamlit Community Cloud using Python 3.13.
+- Explain major changes before making risky modifications.
+- Never hardcode misleading investment returns or claim that returns are guaranteed.
+
+PHASE 1 — INSPECT THE PROJECT
+
+Review `main.py`, `calculator.py`, `styles.py`, `pyproject.toml`, `uv.lock`, and the existing tests.
+
+Identify:
+1. What currently works.
+2. Any calculation errors or missing functionality.
+3. Any UI or usability problems.
+4. Any deployment risks.
+5. Which improvements provide the most value for a beginner investor.
+
+Keep the current app working while making improvements.
+
+PHASE 2 — IMPROVE THE INVESTMENT CALCULATOR
+
+Create a clear, professional investment projection calculator with the following inputs:
+- Initial investment.
+- Monthly contribution.
+- Investment period in years.
+- Expected annual rate of return.
+- Optional annual inflation rate.
+- Contribution timing assumption, clearly explained.
+
+Display:
+- Total amount contributed.
+- Estimated investment growth.
+- Projected portfolio value.
+- Estimated value adjusted for inflation, if enabled.
+- A chart showing the projected portfolio growth over time.
+- A breakdown of contributions versus investment growth.
+- A clear summary of the user's selected assumptions.
+
+Make sure the calculation logic is mathematically correct. Handle zero returns, zero contributions, short periods, and invalid inputs. Clearly state whether contributions occur at the beginning or end of each period, and use consistent compounding assumptions.
+
+PHASE 3 — IMPROVE THE DESIGN
+
+Create a clean, modern financial product interface called InvestPath.
+
+Design principles:
+- Professional, minimal layout.
+- Clear typography and readable labels.
+- Consistent spacing and alignment.
+- A restrained color palette.
+- Easy-to-understand financial metrics.
+- Responsive layout suitable for laptops and mobile browsers.
+- Helpful descriptions beside financial inputs.
+- Avoid unnecessary animations, clutter, and excessive cards.
+
+The application should feel trustworthy and simple rather than like a complicated trading terminal.
+
+PHASE 4 — EDUCATE THE USER
+
+Add short explanations for beginners:
+- What compound growth means.
+- Why regular contributions matter.
+- Why higher expected returns imply higher uncertainty.
+- Why inflation reduces purchasing power.
+- Why projections are scenarios, not predictions.
+
+Include a prominent disclaimer that the calculator is for educational purposes and does not provide personalized financial advice. Do not recommend specific securities or guarantee profits.
+
+PHASE 5 — TEST AND VERIFY
+
+- Add or update unit tests for the calculation functions in `calculator.py`.
+- Test zero returns, positive returns, monthly contributions, and inflation adjustment.
+- Run the available test suite.
+- Check that the app starts correctly.
+- Check that the Streamlit deployment configuration and dependencies remain compatible with Python 3.13.
+- Fix errors introduced by your changes.
+- Do not claim tests passed unless you actually ran them.
+
+PHASE 6 — REPORT BACK
+
+When finished, provide:
+1. A summary of changes made.
+2. A list of files modified.
+3. Test results.
+4. Any remaining bugs or limitations.
+5. Exact instructions for verifying the changes on the deployed website.
+
+Work directly on the existing project. Prioritize calculation accuracy, usability, and reliability over adding lots of features. If a major requirement is already implemented correctly, preserve it rather than duplicating it.

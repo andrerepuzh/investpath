@@ -17,6 +17,7 @@ class ProjectionPoint:
 class Projection:
     years: int
     monthly_rate: float
+    contribution_timing: str
     total_contributions: float
     portfolio_value: float
     estimated_gain: float
@@ -36,13 +37,15 @@ def calculate_projection(
     annual_return: float,
     annual_fee: float = 0.0,
     annual_inflation: float = 0.0,
+    contribution_timing: str = "end",
 ) -> Projection:
     """Project monthly investing using effective annual rates.
 
     All rates are decimals (for example, 0.06 means 6%). The simplified model
     subtracts the annual fee from the assumed annual return, then converts that
     net effective annual rate to an effective monthly rate. Contributions are
-    deposited at the end of each month, after that month's growth.
+    deposited at the end of each month by default. Set contribution_timing to
+    "beginning" to deposit before that month's growth.
     """
     values = {
         "Initial investment": initial_investment,
@@ -54,6 +57,8 @@ def calculate_projection(
     for name, value in values.items():
         _require_finite(name, value)
 
+    if contribution_timing not in {"beginning", "end"}:
+        raise ValueError("Contribution timing must be 'beginning' or 'end'.")
     if initial_investment < 0:
         raise ValueError("Initial investment cannot be negative.")
     if monthly_contribution < 0:
@@ -76,9 +81,13 @@ def calculate_projection(
     timeline = [ProjectionPoint(0, contributions, balance)]
 
     for month in range(1, months + 1):
-        # Grow the existing balance first, then add this month's contribution.
-        balance *= 1 + monthly_rate
-        balance += monthly_contribution
+        if contribution_timing == "beginning":
+            balance += monthly_contribution
+            balance *= 1 + monthly_rate
+        else:
+            # Month-end deposits begin growing in the following month.
+            balance *= 1 + monthly_rate
+            balance += monthly_contribution
         contributions += monthly_contribution
         timeline.append(ProjectionPoint(month, contributions, balance))
 
@@ -87,6 +96,7 @@ def calculate_projection(
     return Projection(
         years=years,
         monthly_rate=monthly_rate,
+        contribution_timing=contribution_timing,
         total_contributions=contributions,
         portfolio_value=balance,
         estimated_gain=balance - contributions,
