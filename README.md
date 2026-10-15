@@ -6,19 +6,22 @@ save the financial assumptions entered on the page.
 
 ## Run it in Replit
 
-The project starts InvestPath through the **Start InvestPath** workflow. Open
-the app preview to use it. The app listens on port `8008`.
+Click **Run** to start the **Project** workflow. Then open the **InvestPath**
+preview at the root path (`/`). Replit routes that preview to the Streamlit
+service automatically.
 
 ## Run it from a terminal
 
-1. Open the Replit Shell.
-2. Run:
+If you want to start Streamlit manually, first stop the **artifacts/investpath:
+web** workflow so the two servers do not compete for the same port. In the
+Replit Shell, run:
 
-   ```bash
-   uv run streamlit run main.py --server.address 0.0.0.0 --server.port 8008 --server.headless true --browser.gatherUsageStats false
-   ```
+```bash
+uv run streamlit run main.py --server.address 0.0.0.0 --server.port 18942 --server.headless true --browser.gatherUsageStats false
+```
 
-3. Open the Replit web preview for port `8008`.
+Then open the **InvestPath** preview. Restart the managed workflow before using
+the **Run** button again.
 
 The first `uv run` installs the dependencies declared in `pyproject.toml` if
 they are not already installed.

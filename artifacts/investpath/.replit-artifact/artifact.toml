@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "InvestPath"
+description = "A beginner-friendly Streamlit investment calculator that illustrates hypothetical euro-based projections with adjustable assumptions, scenarios, and clear calculation explanations."
+version = "1.0.0"
+id = "artifacts/investpath"
+router = "path"
+
+[[services]]
+name = "web"
+paths = ["/"]
+localPort = 18942
+
+[services.development]
+run = "uv run streamlit run ../../main.py --server.address 0.0.0.0 --server.port $PORT --server.headless true --browser.gatherUsageStats false"
+
+[services.production]
+build = ["uv", "sync", "--frozen"]
+
+[services.production.run]
+args = ["uv", "run", "--frozen", "streamlit", "run", "../../main.py", "--server.address", "0.0.0.0", "--server.port", "18942", "--server.headless", "true", "--browser.gatherUsageStats", "false"]
+
+[services.production.run.env]
+PORT = "18942"
+
+[services.env]
+PORT = "18942"
+BASE_PATH = "/"

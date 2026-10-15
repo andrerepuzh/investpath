@@ -18,19 +18,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "InvestPath: Streamlit App"
-
-[[workflows.workflow]]
-name = "InvestPath: Streamlit App"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "uv run streamlit run main.py --server.address 0.0.0.0 --server.port 8008 --server.headless true --browser.gatherUsageStats false"
-waitForPort = 8008
+args = "artifacts/investpath: web"
 
 [agent]
 stack = "PNPM_WORKSPACE"
