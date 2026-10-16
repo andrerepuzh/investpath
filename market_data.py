@@ -62,14 +62,15 @@ def calculate_cagr(start_price: float, end_price: float, start_date: Any, end_da
 
 
 def fetch_market_history(ticker: str, period: str = "max") -> pd.DataFrame:
-    """Fetch historical daily price data for a ticker using yfinance."""
+    """Fetch historical daily price data for a ticker using yfinance, ensuring sorted and valid numeric values."""
     try:
         t = yf.Ticker(ticker)
         df = t.history(period=period)
         if df is None or df.empty or "Close" not in df.columns:
             return pd.DataFrame()
-        # Clean up timezone or missing values
         df = df.dropna(subset=["Close"])
+        df = df[pd.to_numeric(df["Close"], errors="coerce").notnull()]
+        df = df.sort_index()
         if df.empty:
             return pd.DataFrame()
         return df
