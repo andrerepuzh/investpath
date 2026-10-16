@@ -1,6 +1,7 @@
 """InvestPath: an educational, premium investment dashboard & financial planning tool."""
 
 import datetime
+import pandas as pd
 import streamlit as st
 
 from calculator import (
@@ -48,6 +49,49 @@ def render_scenario(name: str, annual_return: float, description: str, projectio
 def get_cached_market_history(ticker: str, period: str):
     """Retrieve historical market prices with 1-hour caching."""
     return fetch_market_history(ticker, period=period)
+
+
+def render_tradingview_widget(ticker: str, height: int = 420):
+    """Embed official TradingView advanced real-time chart widget."""
+    tv_symbol_map = {
+        "^GSPC": "SP:SPX",
+        "^NDX": "NASDAQ:NDX",
+        "AAPL": "NASDAQ:AAPL",
+        "MSFT": "NASDAQ:MSFT",
+        "TSLA": "NASDAQ:TSLA",
+        "SPY": "AMEX:SPY",
+        "VOO": "NYSE:VOO",
+        "QQQ": "NASDAQ:QQQ",
+        "BTC-USD": "BINANCE:BTCUSDT",
+        "ETH-USD": "BINANCE:ETHUSDT",
+    }
+    tv_symbol = tv_symbol_map.get(ticker, f"NASDAQ:{ticker}")
+
+    html_code = f"""
+    <div class="tradingview-widget-container" style="height:{height}px;width:100%">
+      <div id="tradingview_widget" style="height:100%;width:100%"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget(
+      {{
+        "width": "100%",
+        "height": "{height}",
+        "symbol": "{tv_symbol}",
+        "interval": "D",
+        "timezone": "Etc/UTC",
+        "theme": "light",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "container_id": "tradingview_widget"
+      }}
+      );
+      </script>
+    </div>
+    """
+    st.components.v1.html(html_code, height=height + 10)
 
 
 def main() -> None:
@@ -176,14 +220,12 @@ def main() -> None:
         annual_return=annual_return_percent / 100,
     )
 
-    # Initialize Portfolio Session State if not present
     if "portfolio_holdings" not in st.session_state:
         st.session_state.portfolio_holdings = [
             {"ticker": "SPY", "shares": 25.0, "avg_cost": 420.0},
             {"ticker": "AAPL", "shares": 15.0, "avg_cost": 175.0},
         ]
 
-    # 3 Core Navigation Tabs
     tab_dashboard, tab_portfolio, tab_planning = st.tabs([
         "📊 Dashboard",
         "💼 My Portfolio",
@@ -195,7 +237,6 @@ def main() -> None:
         st.subheader("Explore Asset Performance")
         st.caption("Select an asset category and search or select an instrument to review historical returns, trends, and pricing.")
 
-        # Flatten asset registry for selection filter
         flat_assets = []
         for cat, assets in ASSET_REGISTRY.items():
             for a in assets:
@@ -237,7 +278,6 @@ def main() -> None:
         if hist_df.empty or "Close" not in hist_df.columns:
             st.error(f"Unable to load historical price data for {selected_asset['ticker']}. Please check your internet connection or try another asset.")
         else:
-            # Ensure sorted and clean numeric values
             hist_df = hist_df.sort_index()
             hist_df = hist_df.dropna(subset=["Close"])
 
@@ -254,7 +294,6 @@ def main() -> None:
                 p_1yr_ago = float(hist_df["Close"].iloc[-252])
                 one_yr_ret = calculate_total_return(p_1yr_ago, end_price)
 
-            # Market summary headline based on return
             trend_desc = "upward trend" if (tot_ret or 0) >= 0 else "downward movement"
             st.markdown(f"**Market Context:** `{selected_asset['name']}` ({selected_asset['ticker']}) reflects a **{trend_desc}** over the selected {time_range} period.")
 
@@ -264,12 +303,23 @@ def main() -> None:
             d_cols[2].metric("Annualized return (CAGR)", f"{cagr*100:+.2f}%" if cagr is not None else "N/A", "Actual elapsed time")
             d_cols[3].metric("1-Year return", f"{one_yr_ret*100:+.2f}%" if one_yr_ret is not None else "N/A", "Trailing 252 trading days")
 
-            st.markdown(f"**Historical Price Chart ({selected_asset['name']} - {time_range})**")
-            chart_data = pd.DataFrame({
-                "Date": hist_df.index,
-                "Close Price": hist_df["Close"].values,
-            }).set_index("Date")
-            st.line_chart(chart_data)
+            # Chart view options: InvestPath Historical Chart vs TradingView Interactive Widget
+            chart_view_mode = st.radio(
+                "Chart Provider",
+                options=["InvestPath Historical Line Chart", "TradingView Interactive Advanced Chart"],
+                horizontal=True,
+            )
+
+            if chart_view_mode == "InvestPath Historical Line Chart":
+                st.markdown(f"**Historical Price Chart ({selected_asset['name']} - {time_range})**")
+                chart_data = pd.DataFrame({
+                    "Date": hist_df.index,
+                    "Close Price": hist_df["Close"].values,
+                }).set_index("Date")
+                st.line_chart(chart_data)
+            else:
+                st.markdown(f"**Interactive TradingView Chart ({selected_asset['name']})**")
+                render_tradingview_widget(selected_asset["ticker"])
 
             st.caption(
                 f"Asset: {selected_asset['name']} ({selected_asset['ticker']}) | Type: {selected_asset['type']} | "
@@ -281,7 +331,6 @@ def main() -> None:
         st.subheader("My Portfolio")
         st.caption("Track your personal holdings, quantity, cost basis, and estimated current value based on live market feeds.")
 
-        # Add / Edit holdings form
         with st.expander("➕ Add or Edit Portfolio Holding"):
             with st.form("portfolio_form"):
                 p_col1, p_col2, p_col3 = st.columns(3)
@@ -298,7 +347,6 @@ def main() -> None:
 
                 submitted = st.form_submit_button("Add to Portfolio")
                 if submitted:
-                    # Update or append holding
                     existing = next((h for h in st.session_state.portfolio_holdings if h["ticker"] == add_asset["ticker"]), None)
                     if existing:
                         existing["shares"] = add_shares
@@ -325,7 +373,6 @@ def main() -> None:
                 cost_basis = shares * avg_cost
                 total_cost_basis += cost_basis
 
-                # Fetch latest price
                 df_h = get_cached_market_history(ticker, period="5d")
                 current_price = avg_cost
                 if not df_h.empty and "Close" in df_h.columns:
@@ -336,7 +383,6 @@ def main() -> None:
                 unrealized_pnl = market_val - cost_basis
                 pnl_pct = (unrealized_pnl / cost_basis) * 100 if cost_basis > 0 else 0.0
 
-                # Find asset metadata
                 meta = next((a for a in flat_assets if a["ticker"] == ticker), {"name": ticker, "type": "Asset"})
 
                 holding_rows.append({
