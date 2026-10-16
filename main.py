@@ -1,4 +1,4 @@
-"""InvestPath: an educational, beginner-friendly investment calculator."""
+"""InvestPath: an educational, beginner-friendly investment calculator & market explorer."""
 
 import streamlit as st
 
@@ -9,6 +9,12 @@ from calculator import (
     export_projection_csv,
     find_milestones,
     run_monte_carlo_simulation,
+)
+from market_data import (
+    ASSET_REGISTRY,
+    calculate_cagr,
+    calculate_total_return,
+    fetch_market_history,
 )
 from styles import apply_styles
 
@@ -37,9 +43,15 @@ def render_scenario(name: str, annual_return: float, description: str, projectio
         st.caption(description)
 
 
+@st.cache_data(ttl=3600)
+def get_cached_market_history(ticker: str, period: str):
+    """Retrieve historical market prices with 1-hour caching."""
+    return fetch_market_history(ticker, period=period)
+
+
 def main() -> None:
     st.set_page_config(
-        page_title="InvestPath — Investment Learning Calculator",
+        page_title="InvestPath — Investment Learning & Market Explorer",
         layout="wide",
     )
     apply_styles()
@@ -51,8 +63,8 @@ def main() -> None:
                 <p class="ip-hero__eyebrow">InvestPath · learn investing by exploring</p>
                 <h1>Your future,<br><span>in focus.</span></h1>
                 <p class="ip-hero__description">
-                    Understand how time, regular savings, and compounding can grow your money.
-                    Explore different scenarios, set financial goals, and learn how investing works at your own pace.
+                    Understand how time, regular savings, and compounding grow your money.
+                    Explore real historical market assets, set financial goals, and learn investing at your own pace.
                 </p>
             </div>
         </section>
@@ -60,7 +72,7 @@ def main() -> None:
         unsafe_allow_html=True,
     )
     st.warning(
-        "All results are hypothetical, for education only, and are not personalized "
+        "All results and historical data are for education only, and are not personalized "
         "financial advice. Real investments can go down as well as up."
     )
 
@@ -174,12 +186,13 @@ def main() -> None:
         annual_return=annual_return_percent / 100,
     )
 
-    # 5 Beginner-Friendly Navigation Tabs
-    tab_home, tab_calc, tab_goals, tab_whatif, tab_learn = st.tabs([
+    # 6 Beginner-Friendly Navigation Tabs (Including Market Explorer)
+    tab_home, tab_calc, tab_goals, tab_whatif, tab_market, tab_learn = st.tabs([
         "🏠 Home",
         "📈 Calculator",
         "🎯 Goals",
         "🎲 What If?",
+        "📊 Market Explorer",
         "💡 Learn",
     ])
 
@@ -199,8 +212,8 @@ def main() -> None:
                 st.metric("Estimated portfolio", format_euros(projection.portfolio_value))
         with col_h2:
             with st.container(border=True):
-                st.markdown("### 🎯 Set Financial Goals")
-                st.write("Find out how much you need to save each month to reach specific wealth targets and track major milestones.")
+                st.markdown("### 📊 Explore Real Markets")
+                st.write("Inspect historical price data and returns for major indices, stocks, ETFs, and cryptocurrencies.")
                 st.metric("Total contributions", format_euros(projection.total_contributions))
         with col_h3:
             with st.container(border=True):
@@ -363,7 +376,6 @@ def main() -> None:
                 "Because future returns are never exact, this helps you see a realistic range of outcomes."
             )
 
-            # We need goal_target_value from tab_goals or default
             target_for_mc = goal_target_value if 'goal_target_value' in locals() else 100_000.0
             mc_result = run_monte_carlo_simulation(
                 initial_investment=initial_investment,
@@ -431,6 +443,81 @@ def main() -> None:
             )
             with column:
                 render_scenario(name, annual_return, description, scenario_projection)
+
+    with tab_market:
+        st.markdown('<p class="ip-section-label">Market Explorer</p>', unsafe_allow_html=True)
+        st.subheader("Explore Real Market History")
+        st.caption("Inspect historical price performance, total returns, and annualized growth rates (CAGR) for major financial assets.")
+
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            category = st.selectbox("Select asset category", options=list(ASSET_REGISTRY.keys()))
+        with col_m2:
+            asset_options = ASSET_REGISTRY[category]
+            selected_asset = st.selectbox(
+                "Select asset",
+                options=asset_options,
+                format_func=lambda x: f"{x['name']} ({x['ticker']})",
+            )
+
+        # Display asset metadata card
+        with st.container(border=True):
+            m_meta1, m_meta2, m_meta3, m_meta4 = st.columns(4)
+            m_meta1.markdown(f"**Asset:** {selected_asset['name']}")
+            m_meta2.markdown(f"**Ticker:** `{selected_asset['ticker']}`")
+            m_meta3.markdown(f"**Type:** {selected_asset['type']}")
+            m_meta4.markdown(f"**Currency:** {selected_asset['currency']} ({selected_asset['source']})")
+
+        time_range = st.selectbox(
+            "Select time range",
+            options=["1 year", "3 years", "5 years", "Max history"],
+            index=3,
+        )
+        period_map = {
+            "1 year": "1y",
+            "3 years": "3y",
+            "5 years": "5y",
+            "Max history": "max",
+        }
+
+        with st.spinner(f"Retrieving historical data for {selected_asset['ticker']}..."):
+            hist_df = get_cached_market_history(selected_asset["ticker"], period_map[time_range])
+
+        if hist_df.empty:
+            st.error(f"Could not retrieve historical data for {selected_asset['ticker']}. Please check your internet connection or try another asset.")
+        else:
+            start_price = float(hist_df["Close"].iloc[0])
+            end_price = float(hist_df["Close"].iloc[-1])
+            start_date = hist_df.index[0]
+            end_date = hist_df.index[-1]
+
+            tot_ret = calculate_total_return(start_price, end_price)
+            cagr = calculate_cagr(start_price, end_price, start_date, end_date)
+
+            # 1-year return if available
+            one_yr_ret = None
+            if len(hist_df) >= 252:
+                p_1yr_ago = float(hist_df["Close"].iloc[-252])
+                one_yr_ret = calculate_total_return(p_1yr_ago, end_price)
+
+            res_cols = st.columns(4)
+            res_cols[0].metric("Latest price", f"{end_price:,.2f} {selected_asset['currency']}", f"As of {end_date.strftime('%Y-%m-%d')}")
+            res_cols[1].metric("Total return", f"{tot_ret*100:+.2f}%" if tot_ret is not None else "N/A", f"From {start_date.strftime('%Y-%m-%d')}")
+            res_cols[2].metric("Annualized return (CAGR)", f"{cagr*100:+.2f}%" if cagr is not None else "N/A", "Actual elapsed time")
+            res_cols[3].metric("1-Year return", f"{one_yr_ret*100:+.2f}%" if one_yr_ret is not None else "N/A", "Trailing 252 trading days")
+
+            st.markdown(f"**Historical price chart ({time_range}):**")
+            chart_chart_data = pd.DataFrame({
+                "Date": hist_df.index,
+                "Close Price": hist_df["Close"].values,
+            }).set_index("Date")
+            st.line_chart(chart_chart_data)
+
+            st.caption(
+                f"Data source: {selected_asset['source']} ({selected_asset['ticker']}). "
+                f"Note: Historical returns are past performance and **do not guarantee future results**. "
+                f"Data retrieved via cached market feed."
+            )
 
     with tab_learn:
         st.markdown('<p class="ip-section-label">Education</p>', unsafe_allow_html=True)
